@@ -276,8 +276,7 @@ func (mw *HertzJWTMiddleware) privateKey() error {
 	}
 
 	if mw.PrivateKeyPassphrase != "" {
-		//nolint:staticcheck
-		key, err := jwt.ParseRSAPrivateKeyFromPEMWithPassword(keyData, mw.PrivateKeyPassphrase)
+		key, err := jwt.ParseRSAPrivateKeyFromPEMWithPassword(keyData, mw.PrivateKeyPassphrase) //lint:ignore SA1019
 		if err != nil {
 			return ErrInvalidPrivKey
 		}
