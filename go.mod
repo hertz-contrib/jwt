@@ -3,15 +3,14 @@ module github.com/hertz-contrib/jwt
 go 1.18
 
 require (
+	github.com/bytedance/sonic v1.3.0
 	github.com/cloudwego/hertz v0.0.1
 	github.com/golang-jwt/jwt/v4 v4.4.1
-	github.com/tidwall/gjson v1.13.0
 )
 
 require (
 	github.com/bytedance/go-tagexpr/v2 v2.9.2 // indirect
 	github.com/bytedance/gopkg v0.0.0-20220413063733-65bf48ffb3a7 // indirect
-	github.com/bytedance/sonic v1.3.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20211019084208-fb5309c8db06 // indirect
 	github.com/cloudwego/netpoll v0.2.4 // indirect
 	github.com/goccy/go-json v0.9.7 // indirect
@@ -21,6 +20,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/nyaruka/phonenumbers v1.0.55 // indirect
 	github.com/stretchr/testify v1.7.1 // indirect
+	github.com/tidwall/gjson v1.13.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
