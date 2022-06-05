@@ -36,7 +36,9 @@ import (
 )
 
 type login struct {
+	//nolint:staticcheck
 	Username string `form:"username,required" json:"username,required"`
+	//nolint:staticcheck
 	Password string `form:"password,required" json:"password,required"`
 }
 

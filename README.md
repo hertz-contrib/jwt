@@ -4,28 +4,18 @@ This is a middleware for [Hertz](https://github.com/cloudwego/hertz) framework.
 
 It uses [jwt-go](https://github.com/golang-jwt/jwt) to provide a jwt authentication middleware. It provides additional handler functions to provide the `login` api that will generate the token and an additional `refresh` handler that can be used to refresh tokens.
 
+This repo is forked from [gin-jwt](https://github.com/appleboy/gin-jwt) and  adapted to Hertz.
+
 ## Security Issue
 
 Simple HS256 JWT token brute force cracker. Effective only to crack JWT tokens with weak secrets. **Recommendation**: Use strong long secrets or `RS256` tokens. See the [jwt-cracker repository](https://github.com/lmammino/jwt-cracker).
 
 ## Usage
 
-Download and install using [go module](https://blog.golang.org/using-go-modules):
+Download and install:
 
 ```sh
 export GO111MODULE=on
-go get github.com/hertz-contrib/jwt
-```
-
-Import it in your code:
-
-```go
-import "github.com/hertz-contrib/jwt"
-```
-
-Download and install without using [go module](https://blog.golang.org/using-go-modules):
-
-```sh
 go get github.com/hertz-contrib/jwt
 ```
 
@@ -222,7 +212,7 @@ Server: hertz
 {
     "code": 200,
     "expire": "2022-06-05T13:49:20+08:00",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NTQ0MDgxNjAsImlkIjoiYWRtaW4iLCJvcmlnX2lhdCI6MTY1NDQwNDU2MH0.QPXRBqzJpfWibK-tMKG9oTWbOres8Ru8Y6uaeBi3x2o"
+    "token": "**"
 }
 ```
 
@@ -238,7 +228,7 @@ Output
 GET /auth/refresh_token HTTP/1.1
 Accept: */*
 Accept-Encoding: gzip, deflate
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NTQ0MDgxNjAsImlkIjoiYWRtaW4iLCJvcmlnX2lhdCI6MTY1NDQwNDU2MH0.QPXRBqzJpfWibK-tMKG9oTWbOres8Ru8Y6uaeBi3x2o
+Authorization: Bearer **
 Connection: keep-alive
 Content-Type: application/json
 Host: localhost:8888
@@ -255,7 +245,7 @@ Server: hertz
 {
     "code": 200,
     "expire": "2022-06-05T13:50:41+08:00",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NTQ0MDgyNDEsImlkIjoiYWRtaW4iLCJvcmlnX2lhdCI6MTY1NDQwNDY0MX0.xMUsi76v0UZIxrkRc8J1WzccUri1P968v2vcxgSHTM4"
+    "token": "**"
 }
 
 ```
@@ -347,7 +337,7 @@ This is hertz middleware that should be used within any endpoints that require t
 
 2. OPTIONAL: `IdentityHandler`
 
-The default of this function is likely sufficient for your needs. The purpose of this function is to fetch the user identity from claims embedded within the jwt token, and pass this identity value to `Authorizator`. This function assummes [`IdentityKey`: some_user_identity] is one of the attributes embedded within the claims of the jwt token (determined by `PayloadFunc`).
+The default of this function is likely sufficient for your needs. The purpose of this function is to fetch the user identity from claims embedded within the jwt token, and pass this identity value to `Authorizator`. This function assumes [`IdentityKey`: some_user_identity] is one of the attributes embedded within the claims of the jwt token (determined by `PayloadFunc`).
 
 3. OPTIONAL: `Authorizator`
 

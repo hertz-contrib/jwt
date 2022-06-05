@@ -48,7 +48,9 @@ import (
 
 // Login form structure.
 type Login struct {
+	//nolint:staticcheck
 	Username string `json:"username,required"`
+	//nolint:staticcheck
 	Password string `json:"password,required"`
 }
 
@@ -241,7 +243,7 @@ func TestMissingAuthenticatorForLoginHandler(t *testing.T) {
 	handler := hertzHandler(authMiddleware)
 
 	body := bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
-	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{"Content-Type", "application/json"})
+	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
 	message := gjson.Get(string(resp.BodyBytes()), "message")
 	assert.DeepEqual(t, ErrMissingAuthenticatorFunc.Error(), message.String())
@@ -296,7 +298,7 @@ func TestLoginHandler(t *testing.T) {
 	handler := hertzHandler(authMiddleware)
 
 	body := bytes.NewReader([]byte("{\"username\": \"admin\"}"))
-	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{"Content-Type", "application/json"})
+	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
 	message := gjson.Get(string(resp.BodyBytes()), "message")
 	assert.DeepEqual(t, ErrMissingLoginValues.Error(), message.String())
@@ -304,14 +306,14 @@ func TestLoginHandler(t *testing.T) {
 	assert.DeepEqual(t, "application/json; charset=utf-8", string(resp.Header.ContentType()))
 
 	body = bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"test\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{"Content-Type", "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
 	message = gjson.Get(string(resp.BodyBytes()), "message")
 	assert.DeepEqual(t, ErrFailedAuthentication.Error(), message.String())
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	body = bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{"Content-Type", "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
 	message = gjson.Get(string(resp.BodyBytes()), "message")
 	assert.DeepEqual(t, "login successfully", message.String())
@@ -332,16 +334,16 @@ func TestParseToken(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", ""})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Test 1234"})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Test 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS384", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS384", "admin")})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -360,16 +362,16 @@ func TestParseTokenRS256(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", ""})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Test 1234"})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Test 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS384", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS384", "admin")})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("RS256", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("RS256", "admin")})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -390,16 +392,16 @@ func TestParseTokenKeyFunc(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", ""})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Test 1234"})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Test 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS384", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS384", "admin")})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("RS256", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("RS256", "admin")})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -431,15 +433,15 @@ func TestRefreshHandlerRS256(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", ""})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Test 1234"})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Test 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil,
-		ut.Header{"Authorization", "Bearer " + makeTokenString("RS256", "admin")},
-		ut.Header{"Cookie", "jwt=" + makeTokenString("RS256", "admin")})
+		ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("RS256", "admin")},
+		ut.Header{Key: "Cookie", Value: "jwt=" + makeTokenString("RS256", "admin")})
 	resp := w.Result()
 	message := gjson.Get(string(resp.BodyBytes()), "message")
 	cookie := gjson.Get(string(resp.BodyBytes()), "cookie")
@@ -460,13 +462,13 @@ func TestRefreshHandler(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", ""})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Test 1234"})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Test 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -490,7 +492,7 @@ func TestExpiredTokenWithinMaxRefreshOnRefreshHandler(t *testing.T) {
 	tokenString, _ := token.SignedString(key)
 
 	// We should be able to refresh a token that has expired but is within the MaxRefresh time
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + tokenString})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -512,7 +514,7 @@ func TestExpiredTokenOnRefreshHandler(t *testing.T) {
 	claims["orig_iat"] = 0
 	tokenString, _ := token.SignedString(key)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + tokenString})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -531,10 +533,10 @@ func TestAuthorizator(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "test")})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "test")})
 	assert.DeepEqual(t, http.StatusForbidden, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -611,27 +613,27 @@ func TestClaimsDuringAuthorization(t *testing.T) {
 		"identity": "administrator",
 	})
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
 	body := bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{"Content-Type", "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
 	token := gjson.Get(string(resp.BodyBytes()), "token")
 	userToken = token.String()
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
 	body = bytes.NewReader([]byte("{\"username\": \"test\",\"password\": \"test\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{"Content-Type", "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
 	token = gjson.Get(string(resp.BodyBytes()), "token")
 	userToken = token.String()
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -672,7 +674,7 @@ func TestEmptyClaims(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer 1234"})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	assert.True(t, len(jwtClaims) == 0)
@@ -693,7 +695,7 @@ func TestUnauthorized(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer 1234"})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -716,7 +718,7 @@ func TestTokenExpire(t *testing.T) {
 		"identity": "admin",
 	})
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -739,10 +741,10 @@ func TestTokenFromQueryString(t *testing.T) {
 		"identity": "admin",
 	})
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token?token="+userToken, nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token?token="+userToken, nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -765,7 +767,7 @@ func TestTokenFromParamPath(t *testing.T) {
 		"identity": "admin",
 	})
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	w = ut.PerformRequest(handler, http.MethodGet, "/g/"+userToken+"/refresh_token", nil)
@@ -791,19 +793,19 @@ func TestTokenFromCookieString(t *testing.T) {
 		"identity": "admin",
 	})
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	resp := w.Result()
 	token := gjson.Get(string(resp.BodyBytes()), "token")
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 	assert.DeepEqual(t, "", token.String())
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Cookie", "token=" + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Cookie", Value: "token=" + userToken})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Cookie", "token=" + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Cookie", Value: "token=" + userToken})
 	resp = w.Result()
 	token = gjson.Get(string(resp.BodyBytes()), "token")
 	assert.DeepEqual(t, http.StatusOK, w.Code)
@@ -822,10 +824,10 @@ func TestDefineTokenHeadName(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "admin")})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "JWTTOKEN " + makeTokenString("HS256", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "JWTTOKEN " + makeTokenString("HS256", "admin")})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -872,10 +874,10 @@ func TestSendAuthorizationBool(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "test")})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "test")})
 	assert.DeepEqual(t, http.StatusForbidden, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "admin")})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
 	resp := w.Result()
 	token := resp.Header.Get("Authorization")
 	assert.DeepEqual(t, "Bearer "+makeTokenString("HS256", "admin"), token)
@@ -901,7 +903,7 @@ func TestExpiredTokenOnAuth(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + makeTokenString("HS256", "admin")})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -916,7 +918,7 @@ func TestBadTokenOnRefreshHandler(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{"Authorization", "Bearer " + "BadToken"})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + "BadToken"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -937,7 +939,7 @@ func TestExpiredField(t *testing.T) {
 	claims["orig_iat"] = 0
 	tokenString, _ := token.SignedString(key)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + tokenString})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
 	resp := w.Result()
 	message := gjson.Get(string(resp.BodyBytes()), "message")
 	assert.DeepEqual(t, http.StatusBadRequest, w.Code)
@@ -947,7 +949,7 @@ func TestExpiredField(t *testing.T) {
 	claims["exp"] = "wrongFormatForExpiryIgnoredByJwtLibrary"
 	tokenString, _ = token.SignedString(key)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + tokenString})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
 	resp = w.Result()
 	message = gjson.Get(string(resp.BodyBytes()), "message")
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
@@ -979,7 +981,7 @@ func TestCheckTokenString(t *testing.T) {
 		"identity": "admin",
 	})
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
 	token, err := authMiddleware.ParseTokenString(userToken)
@@ -989,7 +991,7 @@ func TestCheckTokenString(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{"Authorization", "Bearer " + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	_, err = authMiddleware.ParseTokenString(userToken)
