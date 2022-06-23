@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   lint-and-ut:
-    runs-on: self-hosted
+    runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v3
 
