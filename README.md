@@ -1,10 +1,10 @@
-# Hertz-JWT
+# Hertz-JWT(*This is a community driven project*)
 
 This is a middleware for [Hertz](https://github.com/cloudwego/hertz) framework.
 
 It uses [jwt-go](https://github.com/golang-jwt/jwt) to provide a jwt authentication middleware. It provides additional handler functions to provide the `login` api that will generate the token and an additional `refresh` handler that can be used to refresh tokens.
 
-This repo is forked from [gin-jwt](https://github.com/appleboy/gin-jwt) and  adapted to Hertz.
+This repo is forked from [gin-jwt](https://github.com/appleboy/gin-jwt) and adapted to Hertz.
 
 ## Security Issue
 
