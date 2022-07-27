@@ -537,7 +537,6 @@ func (mw *HertzJWTMiddleware) LoginHandler(ctx context.Context, c *app.RequestCo
 
 		if mw.CookieSameSite != 0 {
 			cookie.SetSameSite(protocol.CookieSameSite(mw.CookieSameSite))
-			c.Response.Header.SetCookie(cookie)
 		}
 		cookie.SetKey(mw.CookieName)
 		cookie.SetValue(tokenString)
@@ -559,7 +558,6 @@ func (mw *HertzJWTMiddleware) LogoutHandler(ctx context.Context, c *app.RequestC
 		cookie := &protocol.Cookie{}
 		if mw.CookieSameSite != 0 {
 			cookie.SetSameSite(protocol.CookieSameSite(mw.CookieSameSite))
-			c.Response.Header.SetCookie(cookie)
 		}
 		cookie.SetKey(mw.CookieName)
 		cookie.SetValue("")
@@ -629,7 +627,6 @@ func (mw *HertzJWTMiddleware) RefreshToken(ctx context.Context, c *app.RequestCo
 
 		if mw.CookieSameSite != 0 {
 			cookie.SetSameSite(protocol.CookieSameSite(mw.CookieSameSite))
-			c.Response.Header.SetCookie(cookie)
 		}
 		cookie.SetKey(mw.CookieName)
 		cookie.SetValue(tokenString)
