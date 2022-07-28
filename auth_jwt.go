@@ -120,6 +120,9 @@ type HertzJWTMiddleware struct {
 	// TokenHeadName is a string in the header. Default value is "Bearer"
 	TokenHeadName string
 
+	// WithoutDefaultTokenHeadName allow set empty TokenHeadName
+	WithoutDefaultTokenHeadName bool
+
 	// TimeFunc provides the current time. You can override it to use another time value. This is useful for testing or if your server uses a different time zone than your tokens.
 	TimeFunc func() time.Time
 
@@ -339,7 +342,7 @@ func (mw *HertzJWTMiddleware) MiddlewareInit() error {
 	}
 
 	mw.TokenHeadName = strings.TrimSpace(mw.TokenHeadName)
-	if len(mw.TokenHeadName) == 0 {
+	if len(mw.TokenHeadName) == 0 && !mw.WithoutDefaultTokenHeadName {
 		mw.TokenHeadName = "Bearer"
 	}
 
@@ -692,11 +695,12 @@ func (mw *HertzJWTMiddleware) jwtFromHeader(ctx context.Context, c *app.RequestC
 	}
 
 	parts := strings.SplitN(authHeader, " ", 2)
-	if !(len(parts) == 2 && parts[0] == mw.TokenHeadName) {
+	if !((len(parts) == 1 && mw.WithoutDefaultTokenHeadName && mw.TokenHeadName == "") ||
+		(len(parts) == 2 && parts[0] == mw.TokenHeadName)) {
 		return "", ErrInvalidAuthHeader
 	}
 
-	return parts[1], nil
+	return parts[len(parts)-1], nil
 }
 
 func (mw *HertzJWTMiddleware) jwtFromQuery(ctx context.Context, c *app.RequestContext, key string) (string, error) {

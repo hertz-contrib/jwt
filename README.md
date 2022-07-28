@@ -130,7 +130,7 @@ func main() {
       // TokenLookup: "query:token",
       // TokenLookup: "cookie:token",
 
-      // TokenHeadName is a string in the header. Default value is "Bearer"
+      // TokenHeadName is a string in the header. Default value is "Bearer". If you want empty value, use WithoutDefaultTokenHeadName.
       TokenHeadName: "Bearer",
 
       // TimeFunc provides the current time. You can override it to use another time value. This is useful for testing or if your server uses a different time zone than your tokens.

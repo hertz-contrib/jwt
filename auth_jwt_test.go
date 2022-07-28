@@ -837,6 +837,42 @@ func TestDefineTokenHeadName(t *testing.T) {
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
+func TestEmptyTokenHeadName(t *testing.T) {
+	// the middleware to test
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                       "test zone",
+		Key:                         key,
+		Timeout:                     time.Hour,
+		TokenHeadName:               "",
+		WithoutDefaultTokenHeadName: true,
+		Authenticator:               defaultAuthenticator,
+	})
+
+	handler := hertzHandler(authMiddleware)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
+	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
+
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: makeTokenString("HS256", "admin")})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+
+	authMiddleware2, _ := New(&HertzJWTMiddleware{
+		Realm:         "test zone",
+		Key:           key,
+		Timeout:       time.Hour,
+		TokenHeadName: "",
+		Authenticator: defaultAuthenticator,
+	})
+
+	handler = hertzHandler(authMiddleware2)
+
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: makeTokenString("HS256", "admin")})
+	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
+}
+
 func TestHTTPStatusMessageFunc(t *testing.T) {
 	successError := errors.New("Successful test error")
 	failedError := errors.New("Failed test error")
