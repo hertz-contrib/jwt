@@ -37,7 +37,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bytedance/sonic"
+	"github.com/tidwall/gjson"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/cloudwego/hertz/pkg/common/test/assert"
@@ -243,9 +244,7 @@ func TestMissingAuthenticatorForLoginHandler(t *testing.T) {
 	body := bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
 	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
-	message, _ := sonic.Get(resp.BodyBytes(), "message")
-	msgStr, _ := message.String()
-	assert.DeepEqual(t, ErrMissingAuthenticatorFunc.Error(), msgStr)
+	assert.DeepEqual(t, ErrMissingAuthenticatorFunc.Error(), gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusInternalServerError, w.Code)
 }
 
@@ -299,26 +298,20 @@ func TestLoginHandler(t *testing.T) {
 	body := bytes.NewReader([]byte("{\"username\": \"admin\"}"))
 	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
-	message, _ := sonic.Get(resp.BodyBytes(), "message")
-	msgStr, _ := message.String()
-	assert.DeepEqual(t, ErrMissingLoginValues.Error(), msgStr)
+	assert.DeepEqual(t, ErrMissingLoginValues.Error(), gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 	assert.DeepEqual(t, "application/json; charset=utf-8", string(resp.Header.ContentType()))
 
 	body = bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"test\"}"))
 	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
-	message, _ = sonic.Get(resp.BodyBytes(), "message")
-	msgStr, _ = message.String()
-	assert.DeepEqual(t, ErrFailedAuthentication.Error(), msgStr)
+	assert.DeepEqual(t, ErrFailedAuthentication.Error(), gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	body = bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
 	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
-	message, _ = sonic.Get(resp.BodyBytes(), "message")
-	msgStr, _ = message.String()
-	assert.DeepEqual(t, "login successfully", msgStr)
+	assert.DeepEqual(t, "login successfully", gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 	assert.True(t, strings.HasPrefix(string(resp.Header.FullCookie()), "jwt="))
 	assert.True(t, strings.HasSuffix(string(resp.Header.FullCookie()), "; max-age=3600; domain=example.com; path=/"))
@@ -445,13 +438,9 @@ func TestRefreshHandlerRS256(t *testing.T) {
 		ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("RS256", "admin")},
 		ut.Header{Key: "Cookie", Value: "jwt=" + makeTokenString("RS256", "admin")})
 	resp := w.Result()
-	message, _ := sonic.Get(resp.BodyBytes(), "message")
-	msgStr, _ := message.String()
-	cookie, _ := sonic.Get(resp.BodyBytes(), "cookie")
-	cookieStr, _ := cookie.String()
-	assert.DeepEqual(t, "refresh successfully", msgStr)
+	assert.DeepEqual(t, "refresh successfully", gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusOK, w.Code)
-	assert.DeepEqual(t, makeTokenString("RS256", "admin"), cookieStr)
+	assert.DeepEqual(t, makeTokenString("RS256", "admin"), gjson.Get(string(resp.BodyBytes()), "cookie").String())
 }
 
 func TestRefreshHandler(t *testing.T) {
@@ -623,21 +612,17 @@ func TestClaimsDuringAuthorization(t *testing.T) {
 	body := bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
 	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
-	token, _ := sonic.Get(resp.BodyBytes(), "token")
-	userToken, _ = token.String()
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + gjson.Get(string(resp.BodyBytes()), "token").String()})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
 	body = bytes.NewReader([]byte("{\"username\": \"test\",\"password\": \"test\"}"))
 	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
-	token, _ = sonic.Get(resp.BodyBytes(), "token")
-	userToken, _ = token.String()
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
-	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
+	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + gjson.Get(string(resp.BodyBytes()), "token").String()})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
@@ -802,20 +787,16 @@ func TestTokenFromCookieString(t *testing.T) {
 
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + userToken})
 	resp := w.Result()
-	token, _ := sonic.Get(resp.BodyBytes(), "token")
-	tokenStr, _ := token.String()
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
-	assert.DeepEqual(t, "", tokenStr)
+	assert.DeepEqual(t, "", gjson.Get(string(resp.BodyBytes()), "token").String())
 
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Cookie", Value: "token=" + userToken})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Cookie", Value: "token=" + userToken})
 	resp = w.Result()
-	token, _ = sonic.Get(resp.BodyBytes(), "token")
-	tokenStr, _ = token.String()
 	assert.DeepEqual(t, http.StatusOK, w.Code)
-	assert.DeepEqual(t, userToken, tokenStr)
+	assert.DeepEqual(t, userToken, gjson.Get(string(resp.BodyBytes()), "token").String())
 }
 
 func TestDefineTokenHeadName(t *testing.T) {
@@ -983,10 +964,8 @@ func TestExpiredField(t *testing.T) {
 
 	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
 	resp := w.Result()
-	message, _ := sonic.Get(resp.BodyBytes(), "message")
-	msgStr, _ := message.String()
 	assert.DeepEqual(t, http.StatusBadRequest, w.Code)
-	assert.DeepEqual(t, ErrMissingExpField.Error(), msgStr)
+	assert.DeepEqual(t, ErrMissingExpField.Error(), gjson.Get(string(resp.BodyBytes()), "message").String())
 
 	// wrong format
 	claims["exp"] = "wrongFormatForExpiryIgnoredByJwtLibrary"
@@ -994,10 +973,8 @@ func TestExpiredField(t *testing.T) {
 
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
 	resp = w.Result()
-	message, _ = sonic.Get(resp.BodyBytes(), "message")
-	msgStr, _ = message.String()
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
-	assert.DeepEqual(t, ErrExpiredToken.Error(), strings.ToLower(msgStr))
+	assert.DeepEqual(t, ErrExpiredToken.Error(), strings.ToLower(gjson.Get(string(resp.BodyBytes()), "message").String()))
 }
 
 func TestCheckTokenString(t *testing.T) {

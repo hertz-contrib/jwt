@@ -179,8 +179,8 @@ type HertzJWTMiddleware struct {
 	// CookieName allow cookie name change for development
 	CookieName string
 
-	// CookieSameSite allow use http.SameSite cookie param
-	CookieSameSite http.SameSite
+	// CookieSameSite allow use protocol.CookieSameSite cookie param
+	CookieSameSite protocol.CookieSameSite
 }
 
 var (
@@ -534,21 +534,9 @@ func (mw *HertzJWTMiddleware) LoginHandler(ctx context.Context, c *app.RequestCo
 
 	// set cookie
 	if mw.SendCookie {
-		cookie := &protocol.Cookie{}
 		expireCookie := mw.TimeFunc().Add(mw.CookieMaxAge)
 		maxage := int(expireCookie.Unix() - mw.TimeFunc().Unix())
-
-		if mw.CookieSameSite != 0 {
-			cookie.SetSameSite(protocol.CookieSameSite(mw.CookieSameSite))
-		}
-		cookie.SetKey(mw.CookieName)
-		cookie.SetValue(tokenString)
-		cookie.SetMaxAge(maxage)
-		cookie.SetPath("/")
-		cookie.SetDomain(mw.CookieDomain)
-		cookie.SetSecure(mw.SecureCookie)
-		cookie.SetHTTPOnly(mw.CookieHTTPOnly)
-		c.Response.Header.SetCookie(cookie)
+		c.SetCookie(mw.CookieName, tokenString, maxage, "/", mw.CookieDomain, mw.CookieSameSite, mw.SecureCookie, mw.CookieHTTPOnly)
 	}
 
 	mw.LoginResponse(ctx, c, http.StatusOK, tokenString, expire)
@@ -558,18 +546,7 @@ func (mw *HertzJWTMiddleware) LoginHandler(ctx context.Context, c *app.RequestCo
 func (mw *HertzJWTMiddleware) LogoutHandler(ctx context.Context, c *app.RequestContext) {
 	// delete auth cookie
 	if mw.SendCookie {
-		cookie := &protocol.Cookie{}
-		if mw.CookieSameSite != 0 {
-			cookie.SetSameSite(protocol.CookieSameSite(mw.CookieSameSite))
-		}
-		cookie.SetKey(mw.CookieName)
-		cookie.SetValue("")
-		cookie.SetMaxAge(-1)
-		cookie.SetPath("/")
-		cookie.SetDomain(mw.CookieDomain)
-		cookie.SetSecure(mw.SecureCookie)
-		cookie.SetHTTPOnly(mw.CookieHTTPOnly)
-		c.Response.Header.SetCookie(cookie)
+		c.SetCookie(mw.CookieName, "", -1, "/", mw.CookieDomain, mw.CookieSameSite, mw.SecureCookie, mw.CookieHTTPOnly)
 	}
 
 	mw.LogoutResponse(ctx, c, http.StatusOK)
@@ -624,21 +601,9 @@ func (mw *HertzJWTMiddleware) RefreshToken(ctx context.Context, c *app.RequestCo
 
 	// set cookie
 	if mw.SendCookie {
-		cookie := &protocol.Cookie{}
 		expireCookie := mw.TimeFunc().Add(mw.CookieMaxAge)
 		maxage := int(expireCookie.Unix() - time.Now().Unix())
-
-		if mw.CookieSameSite != 0 {
-			cookie.SetSameSite(protocol.CookieSameSite(mw.CookieSameSite))
-		}
-		cookie.SetKey(mw.CookieName)
-		cookie.SetValue(tokenString)
-		cookie.SetMaxAge(maxage)
-		cookie.SetPath("/")
-		cookie.SetDomain(mw.CookieDomain)
-		cookie.SetSecure(mw.SecureCookie)
-		cookie.SetHTTPOnly(mw.CookieHTTPOnly)
-		c.Response.Header.SetCookie(cookie)
+		c.SetCookie(mw.CookieName, tokenString, maxage, "/", mw.CookieDomain, mw.CookieSameSite, mw.SecureCookie, mw.CookieHTTPOnly)
 	}
 
 	return tokenString, expire, nil
