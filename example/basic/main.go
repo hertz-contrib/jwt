@@ -28,7 +28,11 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"time"
+
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/cloudwego/hertz/pkg/protocol"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -60,25 +64,11 @@ func main() {
 
 	// the jwt middleware
 	authMiddleware, err := jwt.New(&jwt.HertzJWTMiddleware{
-		Realm:       "test zone",
-		Key:         []byte("secret key"),
-		Timeout:     time.Hour,
-		MaxRefresh:  time.Hour,
-		IdentityKey: identityKey,
-		PayloadFunc: func(data interface{}) jwt.MapClaims {
-			if v, ok := data.(*User); ok {
-				return jwt.MapClaims{
-					identityKey: v.UserName,
-				}
-			}
-			return jwt.MapClaims{}
-		},
-		IdentityHandler: func(ctx context.Context, c *app.RequestContext) interface{} {
-			claims := jwt.ExtractClaims(ctx, c)
-			return &User{
-				UserName: claims[identityKey].(string),
-			}
-		},
+		Realm:            "test zone",
+		SigningAlgorithm: "HS256",
+		Key:              []byte("secret key"),
+		Timeout:          time.Hour,
+		MaxRefresh:       time.Hour,
 		Authenticator: func(ctx context.Context, c *app.RequestContext) (interface{}, error) {
 			var loginVals login
 			if err := c.BindAndValidate(&loginVals); err != nil {
@@ -104,12 +94,46 @@ func main() {
 
 			return false
 		},
+		PayloadFunc: func(data interface{}) jwt.MapClaims {
+			if v, ok := data.(*User); ok {
+				return jwt.MapClaims{
+					identityKey: v.UserName,
+				}
+			}
+			return jwt.MapClaims{}
+		},
 		Unauthorized: func(ctx context.Context, c *app.RequestContext, code int, message string) {
 			c.JSON(code, map[string]interface{}{
 				"code":    code,
 				"message": message,
 			})
 		},
+		LoginResponse: func(ctx context.Context, c *app.RequestContext, code int, token string, expire time.Time) {
+			c.JSON(http.StatusOK, map[string]interface{}{
+				"code":   http.StatusOK,
+				"token":  token,
+				"expire": expire.Format(time.RFC3339),
+			})
+		},
+		LogoutResponse: func(ctx context.Context, c *app.RequestContext, code int) {
+			c.JSON(http.StatusOK, map[string]interface{}{
+				"code": http.StatusOK,
+			})
+		},
+		RefreshResponse: func(ctx context.Context, c *app.RequestContext, code int, token string, expire time.Time) {
+			c.JSON(http.StatusOK, map[string]interface{}{
+				"code":   http.StatusOK,
+				"token":  token,
+				"expire": expire.Format(time.RFC3339),
+			})
+		},
+		IdentityHandler: func(ctx context.Context, c *app.RequestContext) interface{} {
+			claims := jwt.ExtractClaims(ctx, c)
+			return &User{
+				UserName: claims[identityKey].(string),
+			}
+		},
+		IdentityKey: identityKey,
 		// TokenLookup is a string in the form of "<source>:<name>" that is used
 		// to extract token from the request.
 		// Optional. Default value "header:Authorization".
@@ -121,30 +145,31 @@ func main() {
 		TokenLookup: "header: Authorization, query: token, cookie: jwt",
 		// TokenLookup: "query:token",
 		// TokenLookup: "cookie:token",
-
-		// TokenHeadName is a string in the header. Default value is "Bearer"
-		TokenHeadName: "Bearer",
-
-		// TimeFunc provides the current time. You can override it to use another time value. This is useful for testing or if your server uses a different time zone than your tokens.
-		TimeFunc: time.Now,
+		TokenHeadName:               "Bearer",
+		WithoutDefaultTokenHeadName: false,
+		TimeFunc:                    time.Now,
+		HTTPStatusMessageFunc: func(e error, ctx context.Context, c *app.RequestContext) string {
+			return e.Error()
+		},
+		SendCookie:        true,
+		CookieMaxAge:      time.Hour,
+		SecureCookie:      false,
+		CookieHTTPOnly:    false,
+		CookieDomain:      ".test.com",
+		CookieName:        "jwt-cookie",
+		CookieSameSite:    protocol.CookieSameSiteDisabled,
+		SendAuthorization: true,
+		DisabledAbort:     false,
 	})
 	if err != nil {
 		log.Fatal("JWT Error:" + err.Error())
 	}
 
-	// When you use jwt.New(), the function is already automatically called for checking,
-	// which means you don't need to call it again.
-	errInit := authMiddleware.MiddlewareInit()
-
-	if errInit != nil {
-		log.Fatal("authMiddleware.MiddlewareInit() Error:" + errInit.Error())
-	}
-
 	h.POST("/login", authMiddleware.LoginHandler)
-
+	h.POST("/logout", authMiddleware.LogoutHandler)
 	h.NoRoute(authMiddleware.MiddlewareFunc(), func(ctx context.Context, c *app.RequestContext) {
 		claims := jwt.ExtractClaims(ctx, c)
-		log.Printf("NoRoute claims: %#v\n", claims)
+		hlog.Infof("NoRoute claims: %#v\n", claims)
 		c.JSON(404, map[string]string{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
 	})
 
