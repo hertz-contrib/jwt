@@ -533,6 +533,25 @@ func TestAuthorizator(t *testing.T) {
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
+func TestParseTokenWithJsonNumber(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:         "test, zone",
+		Key:           key,
+		Timeout:       time.Hour,
+		MaxRefresh:    time.Hour * 24,
+		Authenticator: defaultAuthenticator,
+		Unauthorized: func(ctx context.Context, c *app.RequestContext, code int, message string) {
+			c.String(code, message)
+		},
+		ParseOptions: []jwt.ParserOption{jwt.WithJSONNumber()},
+	})
+
+	handler := hertzHandler(authMiddleware)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+}
+
 func TestClaimsDuringAuthorization(t *testing.T) {
 	// the middleware to test
 	authMiddleware, _ := New(&HertzJWTMiddleware{
