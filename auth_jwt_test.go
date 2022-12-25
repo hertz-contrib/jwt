@@ -28,6 +28,7 @@ package jwt
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -76,6 +77,28 @@ func makeTokenString(SigningAlgorithm, username string) string {
 	token := jwt.New(jwt.GetSigningMethod(SigningAlgorithm))
 	claims := token.Claims.(jwt.MapClaims)
 	claims["identity"] = username
+	claims["exp"] = time.Now().Add(time.Hour).Unix()
+	claims["orig_iat"] = time.Now().Unix()
+	var tokenString string
+	if SigningAlgorithm == "RS256" {
+		keyData, _ := ioutil.ReadFile("testdata/jwtRS256.key")
+		signKey, _ := jwt.ParseRSAPrivateKeyFromPEM(keyData)
+		tokenString, _ = token.SignedString(signKey)
+	} else {
+		tokenString, _ = token.SignedString(key)
+	}
+
+	return tokenString
+}
+
+func makeTokenStringWithUserID(SigningAlgorithm string, userID int64) string {
+	if SigningAlgorithm == "" {
+		SigningAlgorithm = "HS256"
+	}
+
+	token := jwt.New(jwt.GetSigningMethod(SigningAlgorithm))
+	claims := token.Claims.(jwt.MapClaims)
+	claims["identity"] = userID
 	claims["exp"] = time.Now().Add(time.Hour).Unix()
 	claims["orig_iat"] = time.Now().Unix()
 	var tokenString string
@@ -534,12 +557,19 @@ func TestAuthorizator(t *testing.T) {
 }
 
 func TestParseTokenWithJsonNumber(t *testing.T) {
+	var userID int64 = 64
 	authMiddleware, _ := New(&HertzJWTMiddleware{
-		Realm:         "test, zone",
-		Key:           key,
-		Timeout:       time.Hour,
-		MaxRefresh:    time.Hour * 24,
-		Authenticator: defaultAuthenticator,
+		Realm:      "test zone",
+		Key:        key,
+		Timeout:    time.Hour,
+		MaxRefresh: time.Hour * 24,
+		IdentityHandler: func(ctx context.Context, c *app.RequestContext) interface{} {
+			claims := ExtractClaims(ctx, c)
+			testNum, err := claims["identity"].(json.Number).Int64()
+			assert.Nil(t, err)
+			assert.DeepEqual(t, userID, testNum)
+			return testNum
+		},
 		Unauthorized: func(ctx context.Context, c *app.RequestContext, code int, message string) {
 			c.String(code, message)
 		},
@@ -548,7 +578,7 @@ func TestParseTokenWithJsonNumber(t *testing.T) {
 
 	handler := hertzHandler(authMiddleware)
 
-	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenStringWithUserID("HS256", userID)})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
