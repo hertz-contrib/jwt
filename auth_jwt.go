@@ -28,6 +28,7 @@ package jwt
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -181,6 +182,9 @@ type HertzJWTMiddleware struct {
 
 	// CookieSameSite allow use protocol.CookieSameSite cookie param
 	CookieSameSite protocol.CookieSameSite
+
+	// ParseOptions allow to modify jwt's parser methods
+	ParseOptions []jwt.ParserOption
 }
 
 var (
@@ -447,19 +451,27 @@ func (mw *HertzJWTMiddleware) middlewareImpl(ctx context.Context, c *app.Request
 		return
 	}
 
-	if claims["exp"] == nil {
+	switch v := claims["exp"].(type) {
+	case nil:
 		mw.unauthorized(ctx, c, http.StatusBadRequest, mw.HTTPStatusMessageFunc(ErrMissingExpField, ctx, c))
 		return
-	}
-
-	if _, ok := claims["exp"].(float64); !ok {
-		mw.unauthorized(ctx, c, http.StatusBadRequest, mw.HTTPStatusMessageFunc(ErrWrongFormatOfExp, ctx, c))
-		return
-	}
-
-	if int64(claims["exp"].(float64)) < mw.TimeFunc().Unix() {
-		mw.unauthorized(ctx, c, http.StatusUnauthorized, mw.HTTPStatusMessageFunc(ErrExpiredToken, ctx, c))
-		return
+	case float64:
+		if int64(v) < mw.TimeFunc().Unix() {
+			mw.unauthorized(ctx, c, http.StatusUnauthorized, mw.HTTPStatusMessageFunc(ErrExpiredToken, ctx, c))
+			return
+		}
+	case json.Number:
+		n, err := v.Int64()
+		if err != nil {
+			mw.unauthorized(ctx, c, http.StatusBadRequest, mw.HTTPStatusMessageFunc(ErrWrongFormatOfExp, ctx, c))
+			return
+		}
+		if n < mw.TimeFunc().Unix() {
+			mw.unauthorized(ctx, c, http.StatusUnauthorized, mw.HTTPStatusMessageFunc(ErrExpiredToken, ctx, c))
+			return
+		}
+	default:
+		mw.Unauthorized(ctx, c, http.StatusBadRequest, mw.HTTPStatusMessageFunc(ErrWrongFormatOfExp, ctx, c))
 	}
 
 	c.Set("JWT_PAYLOAD", claims)
@@ -728,7 +740,7 @@ func (mw *HertzJWTMiddleware) ParseToken(ctx context.Context, c *app.RequestCont
 	}
 
 	if mw.KeyFunc != nil {
-		return jwt.Parse(token, mw.KeyFunc)
+		return jwt.Parse(token, mw.KeyFunc, mw.ParseOptions...)
 	}
 
 	return jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
@@ -743,13 +755,13 @@ func (mw *HertzJWTMiddleware) ParseToken(ctx context.Context, c *app.RequestCont
 		c.Set("JWT_TOKEN", token)
 
 		return mw.Key, nil
-	})
+	}, mw.ParseOptions...)
 }
 
 // ParseTokenString parse jwt token string
 func (mw *HertzJWTMiddleware) ParseTokenString(token string) (*jwt.Token, error) {
 	if mw.KeyFunc != nil {
-		return jwt.Parse(token, mw.KeyFunc)
+		return jwt.Parse(token, mw.KeyFunc, mw.ParseOptions...)
 	}
 
 	return jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
@@ -761,7 +773,7 @@ func (mw *HertzJWTMiddleware) ParseTokenString(token string) (*jwt.Token, error)
 		}
 
 		return mw.Key, nil
-	})
+	}, mw.ParseOptions...)
 }
 
 func (mw *HertzJWTMiddleware) unauthorized(ctx context.Context, c *app.RequestContext, code int, message string) {
