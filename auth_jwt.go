@@ -710,6 +710,16 @@ func (mw *HertzJWTMiddleware) jwtFromParam(ctx context.Context, c *app.RequestCo
 	return token, nil
 }
 
+func  (mw *HertzJWTMiddleware) jwtFromForm(ctx context.Context, c *app.RequestContext, key string) (string, error) {
+	token, _ := c.GetPostForm(key)
+
+	if token == "" {
+		return "", ErrEmptyParamToken
+	}
+
+	return token, nil
+}
+
 // ParseToken parse jwt token from hertz context
 func (mw *HertzJWTMiddleware) ParseToken(ctx context.Context, c *app.RequestContext) (*jwt.Token, error) {
 	var token string
@@ -732,6 +742,8 @@ func (mw *HertzJWTMiddleware) ParseToken(ctx context.Context, c *app.RequestCont
 			token, err = mw.jwtFromCookie(ctx, c, v)
 		case "param":
 			token, err = mw.jwtFromParam(ctx, c, v)
+		case "form":
+			token, err = mw.jwtFromForm(ctx,c,v)
 		}
 	}
 
