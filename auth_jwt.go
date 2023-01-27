@@ -116,6 +116,8 @@ type HertzJWTMiddleware struct {
 	// - "header:<name>"
 	// - "query:<name>"
 	// - "cookie:<name>"
+	// - "param:<name>"
+	// - "form:<name>"
 	TokenLookup string
 
 	// TokenHeadName is a string in the header. Default value is "Bearer"
@@ -229,6 +231,9 @@ var (
 
 	// ErrEmptyParamToken can be thrown if authing with parameter in path, the parameter in path is empty
 	ErrEmptyParamToken = errors.New("parameter token is empty")
+
+	// ErrEmptyFormToken can be thrown if authing with post form, the form token is empty
+	ErrEmptyFormToken = errors.New("form token is empty")
 
 	// ErrInvalidSigningAlgorithm indicates signing algorithm is invalid, needs to be HS256, HS384, HS512, RS256, RS384 or RS512
 	ErrInvalidSigningAlgorithm = errors.New("invalid signing algorithm")
@@ -664,7 +669,7 @@ func (mw *HertzJWTMiddleware) TokenGenerator(data interface{}) (string, time.Tim
 	return tokenString, expire, nil
 }
 
-func (mw *HertzJWTMiddleware) jwtFromHeader(ctx context.Context, c *app.RequestContext, key string) (string, error) {
+func (mw *HertzJWTMiddleware) jwtFromHeader(_ context.Context, c *app.RequestContext, key string) (string, error) {
 	authHeader := c.Request.Header.Get(key)
 
 	if authHeader == "" {
@@ -680,7 +685,7 @@ func (mw *HertzJWTMiddleware) jwtFromHeader(ctx context.Context, c *app.RequestC
 	return parts[len(parts)-1], nil
 }
 
-func (mw *HertzJWTMiddleware) jwtFromQuery(ctx context.Context, c *app.RequestContext, key string) (string, error) {
+func (mw *HertzJWTMiddleware) jwtFromQuery(_ context.Context, c *app.RequestContext, key string) (string, error) {
 	token := c.Query(key)
 
 	if token == "" {
@@ -690,7 +695,7 @@ func (mw *HertzJWTMiddleware) jwtFromQuery(ctx context.Context, c *app.RequestCo
 	return token, nil
 }
 
-func (mw *HertzJWTMiddleware) jwtFromCookie(ctx context.Context, c *app.RequestContext, key string) (string, error) {
+func (mw *HertzJWTMiddleware) jwtFromCookie(_ context.Context, c *app.RequestContext, key string) (string, error) {
 	cookie := string(c.Cookie(key))
 
 	if cookie == "" {
@@ -700,11 +705,21 @@ func (mw *HertzJWTMiddleware) jwtFromCookie(ctx context.Context, c *app.RequestC
 	return cookie, nil
 }
 
-func (mw *HertzJWTMiddleware) jwtFromParam(ctx context.Context, c *app.RequestContext, key string) (string, error) {
+func (mw *HertzJWTMiddleware) jwtFromParam(_ context.Context, c *app.RequestContext, key string) (string, error) {
 	token := c.Param(key)
 
 	if token == "" {
 		return "", ErrEmptyParamToken
+	}
+
+	return token, nil
+}
+
+func (mw *HertzJWTMiddleware) jwtFromForm(_ context.Context, c *app.RequestContext, key string) (string, error) {
+	token := c.PostForm(key)
+
+	if token == "" {
+		return "", ErrEmptyFormToken
 	}
 
 	return token, nil
@@ -732,6 +747,8 @@ func (mw *HertzJWTMiddleware) ParseToken(ctx context.Context, c *app.RequestCont
 			token, err = mw.jwtFromCookie(ctx, c, v)
 		case "param":
 			token, err = mw.jwtFromParam(ctx, c, v)
+		case "form":
+			token, err = mw.jwtFromForm(ctx, c, v)
 		}
 	}
 
