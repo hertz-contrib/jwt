@@ -247,6 +247,7 @@ func hertzHandler(auth *HertzJWTMiddleware) *route.Engine {
 	group.Use(auth.MiddlewareFunc())
 	{
 		group.GET("/hello", helloHandler)
+		group.POST("/hello", helloHandler)
 	}
 
 	return r
@@ -362,6 +363,29 @@ func TestParseToken(t *testing.T) {
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/hello", nil, ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("HS256", "admin")})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+}
+
+func TestParseTokenWithFrom(t *testing.T) {
+	// the middleware to test
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:         "test zone",
+		Key:           key,
+		Timeout:       time.Hour,
+		MaxRefresh:    time.Hour * 24,
+		Authenticator: defaultAuthenticator,
+		TokenLookup:   "form:Authorization",
+	})
+
+	handler := hertzHandler(authMiddleware)
+
+	w := ut.PerformRequest(handler, http.MethodPost, "/auth/hello", &ut.Body{
+		Body: bytes.NewBufferString("Authorization=" + makeTokenString("HS256", "admin")),
+		Len:  -1,
+	}, ut.Header{
+		Key:   "Content-Type",
+		Value: "application/x-www-form-urlencoded",
+	})
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
