@@ -312,6 +312,111 @@ Use these options for setting the JWT in a cookie. See the Mozilla [documentatio
   CookieSameSite:   http.SameSiteDefaultMode, //SameSiteDefaultMode, SameSiteLaxMode, SameSiteStrictMode, SameSiteNoneMode
 ```
 
+### Blacklist Mode
+
+backend cannot force the user to logout when user still has jwt Of course, you can delete the token on the client, 
+but it can still be accessed normally with the token elsewhere In order to support logout and actively force users to offline in the background,
+we add the token to the blacklist when logging off.
+When the user sends a request, If the token is in the blacklist, the user's subsequent operations will be blocked and the invalid token will be returned error.
+For the maintenance of the list, you can use Redis, the expiration time of the token is same as the key ttl in redis
+
+```go
+// The MIT License (MIT)
+//
+// Copyright (c) 2016 Bo-Yi Wu
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// This file may have been modified by CloudWeGo authors. All CloudWeGo
+// Modifications are Copyright 2022 CloudWeGo Authors.
+
+package main
+
+import (
+	"context"
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/go-redis/redis/v8"
+	"github.com/hertz-contrib/jwt"
+	"log"
+)
+
+type login struct {
+	Username string `form:"username,required" json:"username,required"` //lint:ignore SA5008 ignoreCheck
+	Password string `form:"password,required" json:"password,required"` //lint:ignore SA5008 ignoreCheck
+}
+
+var identityKey = "id"
+
+func PingHandler(c context.Context, ctx *app.RequestContext) {
+	ctx.JSON(200, map[string]string{
+		"ping": "pong",
+	})
+}
+
+// User demo
+type User struct {
+	UserName  string
+	FirstName string
+	LastName  string
+}
+
+func main() {
+	h := server.Default()
+
+	// the jwt middleware
+	authMiddleware, err := jwt.New(&jwt.HertzJWTMiddleware{})
+	if err != nil {
+		log.Fatal("JWT Error:" + err.Error())
+	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "pass",
+		DB:       0,
+	})
+
+	blacklistStore := jwt.NewBlackListRedisStore(rdb, authMiddleware.Timeout)
+
+	authMiddleware.EnableBlackListMode(blacklistStore)
+
+	h.POST("/login", authMiddleware.LoginHandler)
+	h.POST("/logout", authMiddleware.LogoutHandler)
+	h.NoRoute(authMiddleware.MiddlewareFunc(), func(ctx context.Context, c *app.RequestContext) {
+		claims := jwt.ExtractClaims(ctx, c)
+		hlog.Infof("NoRoute claims: %#v\n", claims)
+		c.JSON(404, map[string]string{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
+	})
+
+	auth := h.Group("/auth")
+	// Refresh time can be longer than token timeout
+	auth.GET("/refresh_token", authMiddleware.RefreshHandler)
+	auth.Use(authMiddleware.MiddlewareFunc())
+	{
+		auth.GET("/ping", PingHandler)
+	}
+
+	h.Spin()
+}
+```
+
 ### Login request flow (using the LoginHandler)
 
 1. PROVIDED: `LoginHandler`

@@ -35,6 +35,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v8"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/golang-jwt/jwt/v4"
@@ -187,6 +189,19 @@ type HertzJWTMiddleware struct {
 
 	// ParseOptions allow to modify jwt's parser methods
 	ParseOptions []jwt.ParserOption
+
+	// BlackListModeEnabled whether blacklist mode is enabled
+	// backend cannot force the user to logout when user still has jwt
+	// Of course, you can delete the token on the client,
+	// but it can still be accessed normally with the token elsewhere
+	// In order to support logout and actively force users to offline in the background,
+	// we add the token to the blacklist when logging off.
+	// When the user sends a request, If the token is in the blacklist,
+	// the user's subsequent operations will be blocked and the invalid token will be returned error
+	// For the maintenance of the list, you can use Redis,
+	// the expiration time of the token is same as the key ttl in redis
+	BlackListModeEnabled bool
+	BlackListStore       BlackListStoreModel
 }
 
 var (
@@ -252,6 +267,8 @@ var (
 
 	// IdentityKey default identity key
 	IdentityKey = "identity"
+
+	ErrTokenInBlacklist = errors.New("token is in blacklist")
 )
 
 // New for check error with HertzJWTMiddleware
@@ -261,6 +278,11 @@ func New(m *HertzJWTMiddleware) (*HertzJWTMiddleware, error) {
 	}
 
 	return m, nil
+}
+
+func (m *HertzJWTMiddleware) EnableBlackListMode(store BlackListStoreModel) {
+	m.BlackListModeEnabled = true
+	m.BlackListStore = store
 }
 
 func (mw *HertzJWTMiddleware) readKeys() error {
@@ -501,6 +523,17 @@ func (mw *HertzJWTMiddleware) GetClaimsFromJWT(ctx context.Context, c *app.Reque
 		return nil, err
 	}
 
+	if mw.BlackListModeEnabled {
+		_, err = mw.BlackListStore.Get(ctx, token.Raw)
+		if err != nil {
+			if err != redis.Nil {
+				return nil, err
+			}
+		} else {
+			return nil, ErrTokenInBlacklist
+		}
+	}
+
 	if mw.SendAuthorization {
 		if v, ok := c.Get("JWT_TOKEN"); ok {
 			c.Header("Authorization", mw.TokenHeadName+" "+v.(string))
@@ -564,6 +597,20 @@ func (mw *HertzJWTMiddleware) LogoutHandler(ctx context.Context, c *app.RequestC
 	// delete auth cookie
 	if mw.SendCookie {
 		c.SetCookie(mw.CookieName, "", -1, "/", mw.CookieDomain, mw.CookieSameSite, mw.SecureCookie, mw.CookieHTTPOnly)
+	}
+
+	if mw.BlackListModeEnabled {
+		token, err := mw.ParseToken(ctx, c)
+		if err != nil {
+			mw.LogoutResponse(ctx, c, http.StatusInternalServerError)
+			return
+		}
+
+		err = mw.BlackListStore.Set(ctx, token.Raw, "1")
+		if err != nil {
+			mw.LogoutResponse(ctx, c, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	mw.LogoutResponse(ctx, c, http.StatusOK)
@@ -633,6 +680,17 @@ func (mw *HertzJWTMiddleware) CheckIfTokenExpire(ctx context.Context, c *app.Req
 		validationErr, ok := err.(*jwt.ValidationError)
 		if !ok || validationErr.Errors != jwt.ValidationErrorExpired {
 			return nil, err
+		}
+	}
+
+	if mw.BlackListModeEnabled {
+		_, err = mw.BlackListStore.Get(ctx, token.Raw)
+		if err != nil {
+			if err != redis.Nil {
+				return nil, err
+			}
+		} else {
+			return nil, ErrTokenInBlacklist
 		}
 	}
 
