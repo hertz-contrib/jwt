@@ -1113,3 +1113,29 @@ func TestLogout(t *testing.T) {
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 	assert.DeepEqual(t, fmt.Sprintf("%s=; domain=%s; path=/", cookieName, cookieDomain), w.Header().Get("Set-Cookie"))
 }
+
+func TestSignedStringWithKeyFunc(t *testing.T) {
+	var used string
+	mwWithoutKeyFunc, _ := New(&HertzJWTMiddleware{
+		Realm:         "test zone",
+		Key:           key,
+		Timeout:       time.Hour,
+		Authenticator: defaultAuthenticator,
+	})
+	mw, _ := New(&HertzJWTMiddleware{
+		Realm: "test zone",
+		Key:   key,
+		KeyFunc: func(*jwt.Token) (interface{}, error) {
+			used = "keyFunc"
+			return []byte("secret"), nil
+		},
+		Timeout:       time.Hour,
+		Authenticator: defaultAuthenticator,
+	})
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	tokenString, _ := mw.signedString(token)
+	tokenStringWithoutKeyFunc, _ := mwWithoutKeyFunc.signedString(token)
+	assert.NotEqual(t, tokenString, tokenStringWithoutKeyFunc)
+	assert.DeepEqual(t, "keyFunc", used)
+}

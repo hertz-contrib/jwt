@@ -572,11 +572,20 @@ func (mw *HertzJWTMiddleware) LogoutHandler(ctx context.Context, c *app.RequestC
 func (mw *HertzJWTMiddleware) signedString(token *jwt.Token) (string, error) {
 	var tokenString string
 	var err error
-	if mw.usingPublicKeyAlgo() {
-		tokenString, err = token.SignedString(mw.privKey)
+	if mw.KeyFunc != nil {
+		key, innerErr := mw.KeyFunc(token)
+		if innerErr != nil {
+			return "", innerErr
+		}
+		tokenString, err = token.SignedString(key)
 	} else {
-		tokenString, err = token.SignedString(mw.Key)
+		if mw.usingPublicKeyAlgo() {
+			tokenString, err = token.SignedString(mw.privKey)
+		} else {
+			tokenString, err = token.SignedString(mw.Key)
+		}
 	}
+
 	return tokenString, err
 }
 
