@@ -215,6 +215,17 @@ func TestMissingTimeOut(t *testing.T) {
 	assert.DeepEqual(t, time.Hour, authMiddleware.Timeout)
 }
 
+func TestMissingTimeoutFunc(t *testing.T) {
+	authMiddleware, err := New(&HertzJWTMiddleware{
+		Realm:         "test zone",
+		Key:           key,
+		Authenticator: defaultAuthenticator,
+	})
+
+	assert.Nil(t, err)
+	assert.DeepEqual(t, time.Hour, authMiddleware.TimeoutFunc(jwt.MapClaims{}))
+}
+
 func TestMissingTokenLookup(t *testing.T) {
 	authMiddleware, err := New(&HertzJWTMiddleware{
 		Realm:         "test zone",
