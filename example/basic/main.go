@@ -40,8 +40,10 @@ import (
 )
 
 type login struct {
-	Username string `form:"username,required" json:"username,required"` //lint:ignore SA5008 ignoreCheck
-	Password string `form:"password,required" json:"password,required"` //lint:ignore SA5008 ignoreCheck
+	// nolint:staticcheck
+	Username string `form:"username,required" json:"username,required"`
+	// nolint:staticcheck
+	Password string `form:"password,required" json:"password,required"`
 }
 
 var identityKey = "id"

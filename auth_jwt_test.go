@@ -49,8 +49,10 @@ import (
 
 // Login form structure.
 type Login struct {
-	Username string `json:"username,required"` //lint:ignore SA5008 ignoreCheck
-	Password string `json:"password,required"` //lint:ignore SA5008 ignoreCheck
+	// nolint:staticcheck
+	Username string `json:"username,required"`
+	// nolint:staticcheck
+	Password string `json:"password,required"`
 }
 
 var (
