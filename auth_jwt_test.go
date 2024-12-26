@@ -38,14 +38,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tidwall/gjson"
-
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/cloudwego/hertz/pkg/common/test/assert"
 	"github.com/cloudwego/hertz/pkg/common/ut"
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/tidwall/gjson"
 )
 
 // Login form structure.
@@ -211,7 +210,7 @@ func TestMissingTimeOut(t *testing.T) {
 		Authenticator: defaultAuthenticator,
 	})
 
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	assert.DeepEqual(t, time.Hour, authMiddleware.Timeout)
 }
 
@@ -233,7 +232,7 @@ func TestMissingTokenLookup(t *testing.T) {
 		Authenticator: defaultAuthenticator,
 	})
 
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	assert.DeepEqual(t, "header:Authorization", authMiddleware.TokenLookup)
 }
 
