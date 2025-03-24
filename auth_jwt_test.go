@@ -211,7 +211,7 @@ func TestMissingTimeOut(t *testing.T) {
 		Authenticator: defaultAuthenticator,
 	})
 
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	assert.DeepEqual(t, time.Hour, authMiddleware.Timeout)
 }
 
