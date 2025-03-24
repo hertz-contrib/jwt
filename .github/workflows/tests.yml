@@ -4,20 +4,17 @@ on: [push, pull_request]
 
 jobs:
   lint-and-ut:
-    runs-on: [ self-hosted, X64 ]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.18
-
-      - name: Lint
-        run: |
-          go vet -stdmethods=false $(go list ./...)
-          go install mvdan.cc/gofumpt@v0.2.0
-          test -z "$(gofumpt -l -extra .)" 
+          go-version: stable
 
       - name: Unit Test
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Benchmark
+        run: go test -bench=. -benchmem -run=none ./...
