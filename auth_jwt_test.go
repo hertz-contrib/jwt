@@ -38,20 +38,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tidwall/gjson"
-
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/cloudwego/hertz/pkg/common/test/assert"
 	"github.com/cloudwego/hertz/pkg/common/ut"
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/tidwall/gjson"
 )
 
 // Login form structure.
 type Login struct {
-	Username string `json:"username,required"` //lint:ignore SA5008 ignoreCheck
-	Password string `json:"password,required"` //lint:ignore SA5008 ignoreCheck
+	// nolint:staticcheck
+	Username string `json:"username,required"`
+	// nolint:staticcheck
+	Password string `json:"password,required"`
 }
 
 var (
@@ -211,8 +212,19 @@ func TestMissingTimeOut(t *testing.T) {
 		Authenticator: defaultAuthenticator,
 	})
 
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	assert.DeepEqual(t, time.Hour, authMiddleware.Timeout)
+}
+
+func TestMissingTimeoutFunc(t *testing.T) {
+	authMiddleware, err := New(&HertzJWTMiddleware{
+		Realm:         "test zone",
+		Key:           key,
+		Authenticator: defaultAuthenticator,
+	})
+
+	assert.Nil(t, err)
+	assert.DeepEqual(t, time.Hour, authMiddleware.TimeoutFunc(jwt.MapClaims{}))
 }
 
 func TestMissingTokenLookup(t *testing.T) {
@@ -222,7 +234,7 @@ func TestMissingTokenLookup(t *testing.T) {
 		Authenticator: defaultAuthenticator,
 	})
 
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	assert.DeepEqual(t, "header:Authorization", authMiddleware.TokenLookup)
 }
 
@@ -320,20 +332,20 @@ func TestLoginHandler(t *testing.T) {
 	handler := hertzHandler(authMiddleware)
 
 	body := bytes.NewReader([]byte("{\"username\": \"admin\"}"))
-	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
+	w := ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: body.Len()}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
 	assert.DeepEqual(t, ErrMissingLoginValues.Error(), gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 	assert.DeepEqual(t, "application/json; charset=utf-8", string(resp.Header.ContentType()))
 
 	body = bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"test\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: body.Len()}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
 	assert.DeepEqual(t, ErrFailedAuthentication.Error(), gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
 	body = bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: body.Len()}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
 	assert.DeepEqual(t, "login successfully", gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusOK, w.Code)
@@ -683,7 +695,7 @@ func TestClaimsDuringAuthorization(t *testing.T) {
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
 	body := bytes.NewReader([]byte("{\"username\": \"admin\",\"password\": \"admin\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: body.Len()}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp := w.Result()
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
@@ -691,7 +703,7 @@ func TestClaimsDuringAuthorization(t *testing.T) {
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 
 	body = bytes.NewReader([]byte("{\"username\": \"test\",\"password\": \"test\"}"))
-	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: -1}, ut.Header{Key: "Content-Type", Value: "application/json"})
+	w = ut.PerformRequest(handler, http.MethodPost, "/login", &ut.Body{Body: body, Len: body.Len()}, ut.Header{Key: "Content-Type", Value: "application/json"})
 	resp = w.Result()
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 

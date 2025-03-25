@@ -31,17 +31,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudwego/hertz/pkg/common/hlog"
-	"github.com/cloudwego/hertz/pkg/protocol"
-
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/hertz-contrib/jwt"
 )
 
 type login struct {
-	Username string `form:"username,required" json:"username,required"` //lint:ignore SA5008 ignoreCheck
-	Password string `form:"password,required" json:"password,required"` //lint:ignore SA5008 ignoreCheck
+	// nolint:staticcheck
+	Username string `form:"username,required" json:"username,required"`
+	// nolint:staticcheck
+	Password string `form:"password,required" json:"password,required"`
 }
 
 var identityKey = "id"

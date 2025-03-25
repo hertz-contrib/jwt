@@ -66,6 +66,9 @@ type HertzJWTMiddleware struct {
 
 	// Duration that a jwt token is valid. Optional, defaults to one hour.
 	Timeout time.Duration
+	// Callback function that will override the default Timeout duration
+	// Optional, defaults to return one hour
+	TimeoutFunc func(claims jwt.MapClaims) time.Duration
 
 	// This field allows clients to refresh their token until MaxRefresh has passed.
 	// Note that clients can refresh their token in the last moment of MaxRefresh.
@@ -288,7 +291,8 @@ func (mw *HertzJWTMiddleware) privateKey() error {
 	}
 
 	if mw.PrivateKeyPassphrase != "" {
-		key, err := jwt.ParseRSAPrivateKeyFromPEMWithPassword(keyData, mw.PrivateKeyPassphrase) //lint:ignore SA1019 ignoreCheck
+		// nolint:staticcheck
+		key, err := jwt.ParseRSAPrivateKeyFromPEMWithPassword(keyData, mw.PrivateKeyPassphrase)
 		if err != nil {
 			return ErrInvalidPrivKey
 		}
@@ -344,6 +348,12 @@ func (mw *HertzJWTMiddleware) MiddlewareInit() error {
 
 	if mw.Timeout == 0 {
 		mw.Timeout = time.Hour
+	}
+
+	if mw.TimeoutFunc == nil {
+		mw.TimeoutFunc = func(claims jwt.MapClaims) time.Duration {
+			return mw.Timeout
+		}
 	}
 
 	if mw.TimeFunc == nil {
@@ -540,7 +550,12 @@ func (mw *HertzJWTMiddleware) LoginHandler(ctx context.Context, c *app.RequestCo
 		}
 	}
 
-	expire := mw.TimeFunc().Add(mw.Timeout)
+	copyClaims := make(jwt.MapClaims, len(claims))
+	for k, v := range claims {
+		copyClaims[k] = v
+	}
+
+	expire := mw.TimeFunc().Add(mw.TimeoutFunc(copyClaims))
 	claims["exp"] = expire.Unix()
 	claims["orig_iat"] = mw.TimeFunc().Unix()
 	tokenString, err := mw.signedString(token)
@@ -603,12 +618,14 @@ func (mw *HertzJWTMiddleware) RefreshToken(ctx context.Context, c *app.RequestCo
 	// Create the token
 	newToken := jwt.New(jwt.GetSigningMethod(mw.SigningAlgorithm))
 	newClaims := newToken.Claims.(jwt.MapClaims)
+	copyClaims := make(jwt.MapClaims, len(claims))
 
-	for key := range claims {
-		newClaims[key] = claims[key]
+	for k, v := range claims {
+		newClaims[k] = claims[k]
+		copyClaims[k] = v
 	}
 
-	expire := mw.TimeFunc().Add(mw.Timeout)
+	expire := mw.TimeFunc().Add(mw.TimeoutFunc(copyClaims))
 	newClaims["exp"] = expire.Unix()
 	newClaims["orig_iat"] = mw.TimeFunc().Unix()
 	tokenString, err := mw.signedString(newToken)
@@ -658,7 +675,12 @@ func (mw *HertzJWTMiddleware) TokenGenerator(data interface{}) (string, time.Tim
 		}
 	}
 
-	expire := mw.TimeFunc().UTC().Add(mw.Timeout)
+	copyClaims := make(jwt.MapClaims, len(claims))
+	for k, v := range claims {
+		copyClaims[k] = v
+	}
+
+	expire := mw.TimeFunc().UTC().Add(mw.TimeoutFunc(copyClaims))
 	claims["exp"] = expire.Unix()
 	claims["orig_iat"] = mw.TimeFunc().Unix()
 	tokenString, err := mw.signedString(token)
