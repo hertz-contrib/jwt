@@ -31,8 +31,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -82,7 +82,7 @@ func makeTokenString(SigningAlgorithm, username string) string {
 	claims["orig_iat"] = time.Now().Unix()
 	var tokenString string
 	if SigningAlgorithm == "RS256" {
-		keyData, _ := ioutil.ReadFile("testdata/jwtRS256.key")
+		keyData, _ := os.ReadFile("testdata/jwtRS256.key")
 		signKey, _ := jwt.ParseRSAPrivateKeyFromPEM(keyData)
 		tokenString, _ = token.SignedString(signKey)
 	} else {
@@ -104,7 +104,7 @@ func makeTokenStringWithUserID(SigningAlgorithm string, userID int64) string {
 	claims["orig_iat"] = time.Now().Unix()
 	var tokenString string
 	if SigningAlgorithm == "RS256" {
-		keyData, _ := ioutil.ReadFile("testdata/jwtRS256.key")
+		keyData, _ := os.ReadFile("testdata/jwtRS256.key")
 		signKey, _ := jwt.ParseRSAPrivateKeyFromPEM(keyData)
 		tokenString, _ = token.SignedString(signKey)
 	} else {
@@ -115,7 +115,7 @@ func makeTokenStringWithUserID(SigningAlgorithm string, userID int64) string {
 }
 
 func keyFunc(token *jwt.Token) (interface{}, error) {
-	cert, err := ioutil.ReadFile("testdata/jwtRS256.key.pub")
+	cert, err := os.ReadFile("testdata/jwtRS256.key.pub")
 	if err != nil {
 		return nil, err
 	}

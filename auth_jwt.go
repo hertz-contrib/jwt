@@ -30,13 +30,14 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol"
+	"github.com/elastic/pkcs8"
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -283,7 +284,7 @@ func (mw *HertzJWTMiddleware) privateKey() error {
 	if mw.PrivKeyFile == "" {
 		keyData = mw.PrivKeyBytes
 	} else {
-		filecontent, err := ioutil.ReadFile(mw.PrivKeyFile)
+		filecontent, err := os.ReadFile(mw.PrivKeyFile)
 		if err != nil {
 			return ErrNoPrivKeyFile
 		}
@@ -291,12 +292,17 @@ func (mw *HertzJWTMiddleware) privateKey() error {
 	}
 
 	if mw.PrivateKeyPassphrase != "" {
-		// nolint:staticcheck
-		key, err := jwt.ParseRSAPrivateKeyFromPEMWithPassword(keyData, mw.PrivateKeyPassphrase)
+		key, err := pkcs8.ParsePKCS8PrivateKey(keyData, []byte(mw.PrivateKeyPassphrase))
 		if err != nil {
 			return ErrInvalidPrivKey
 		}
-		mw.privKey = key
+
+		rsaKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return ErrInvalidPrivKey
+		}
+
+		mw.privKey = rsaKey
 		return nil
 	}
 
@@ -313,7 +319,7 @@ func (mw *HertzJWTMiddleware) publicKey() error {
 	if mw.PubKeyFile == "" {
 		keyData = mw.PubKeyBytes
 	} else {
-		filecontent, err := ioutil.ReadFile(mw.PubKeyFile)
+		filecontent, err := os.ReadFile(mw.PubKeyFile)
 		if err != nil {
 			return ErrNoPubKeyFile
 		}
