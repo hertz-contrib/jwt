@@ -633,7 +633,13 @@ func (mw *HertzJWTMiddleware) RefreshToken(ctx context.Context, c *app.RequestCo
 
 	expire := mw.TimeFunc().Add(mw.TimeoutFunc(copyClaims))
 	newClaims["exp"] = expire.Unix()
-	newClaims["orig_iat"] = mw.TimeFunc().Unix()
+	// Preserve the original orig_iat to maintain MaxRefresh window
+	if origIat, exists := claims["orig_iat"]; exists {
+		newClaims["orig_iat"] = origIat
+	} else {
+		// If orig_iat doesn't exist (backward compatibility), set it to current time
+		newClaims["orig_iat"] = mw.TimeFunc().Unix()
+	}
 	tokenString, err := mw.signedString(newToken)
 	if err != nil {
 		return "", time.Now(), err
