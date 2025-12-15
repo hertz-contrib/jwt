@@ -548,6 +548,50 @@ func TestExpiredTokenWithinMaxRefreshOnRefreshHandler(t *testing.T) {
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 }
 
+func TestOrigIatPreservedOnRefresh(t *testing.T) {
+	// Test that orig_iat is preserved when refreshing a token
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:         "test zone",
+		Key:           key,
+		Timeout:       time.Hour,
+		MaxRefresh:    2 * time.Hour,
+		Authenticator: defaultAuthenticator,
+	})
+
+	handler := hertzHandler(authMiddleware)
+
+	// Create initial token with orig_iat set to 1 hour ago
+	originalOrigIat := time.Now().Add(-time.Hour).Unix()
+	token := jwt.New(jwt.GetSigningMethod("HS256"))
+	claims := token.Claims.(jwt.MapClaims)
+	claims["identity"] = "admin"
+	claims["exp"] = time.Now().Add(-time.Minute).Unix() // Expired 1 minute ago
+	claims["orig_iat"] = originalOrigIat
+	tokenString, _ := token.SignedString(key)
+
+	// Refresh the token
+	w := ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+
+	// Parse the response to get the new token
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Nil(t, err)
+	newTokenString, ok := response["token"].(string)
+	assert.True(t, ok)
+
+	// Parse the new token and verify orig_iat is preserved
+	newToken, err := jwt.Parse(newTokenString, func(token *jwt.Token) (interface{}, error) {
+		return key, nil
+	})
+	assert.Nil(t, err)
+	newClaims := newToken.Claims.(jwt.MapClaims)
+	newOrigIat, ok := newClaims["orig_iat"].(float64)
+	assert.True(t, ok)
+	// orig_iat should be preserved (within 1 second tolerance)
+	assert.DeepEqual(t, originalOrigIat, int64(newOrigIat))
+}
+
 func TestExpiredTokenOnRefreshHandler(t *testing.T) {
 	// the middleware to test
 	authMiddleware, _ := New(&HertzJWTMiddleware{
