@@ -493,9 +493,10 @@ func TestRefreshHandlerRS256(t *testing.T) {
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil, ut.Header{Key: "Authorization", Value: "Test 1234"})
 	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
 
+	token := makeTokenString("RS256", "admin")
 	w = ut.PerformRequest(handler, http.MethodGet, "/auth/refresh_token", nil,
-		ut.Header{Key: "Authorization", Value: "Bearer " + makeTokenString("RS256", "admin")},
-		ut.Header{Key: "Cookie", Value: "jwt=" + makeTokenString("RS256", "admin")})
+		ut.Header{Key: "Authorization", Value: "Bearer " + token},
+		ut.Header{Key: "Cookie", Value: "jwt=" + token})
 	resp := w.Result()
 	assert.DeepEqual(t, "refresh successfully", gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusOK, w.Code)
