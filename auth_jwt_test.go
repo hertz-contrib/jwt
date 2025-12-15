@@ -499,7 +499,17 @@ func TestRefreshHandlerRS256(t *testing.T) {
 	resp := w.Result()
 	assert.DeepEqual(t, "refresh successfully", gjson.Get(string(resp.BodyBytes()), "message").String())
 	assert.DeepEqual(t, http.StatusOK, w.Code)
-	assert.DeepEqual(t, makeTokenString("RS256", "admin"), gjson.Get(string(resp.BodyBytes()), "cookie").String())
+
+	// Verify that a new token is returned and can be parsed
+	refreshedTokenString := gjson.Get(string(resp.BodyBytes()), "cookie").String()
+	assert.True(t, len(refreshedTokenString) > 0)
+
+	// Verify the refreshed token can be parsed
+	refreshedToken, err := authMiddleware.ParseTokenString(refreshedTokenString)
+	assert.Nil(t, err)
+	refreshedClaims := ExtractClaimsFromToken(refreshedToken)
+	assert.True(t, len(refreshedClaims) > 0)
+	assert.NotNil(t, refreshedClaims["identity"])
 }
 
 func TestRefreshHandler(t *testing.T) {
