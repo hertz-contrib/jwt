@@ -514,6 +514,15 @@ func (mw *HertzJWTMiddleware) middlewareImpl(ctx context.Context, c *app.Request
 func (mw *HertzJWTMiddleware) GetClaimsFromJWT(ctx context.Context, c *app.RequestContext) (MapClaims, error) {
 	token, err := mw.ParseToken(ctx, c)
 	if err != nil {
+		// Normalize expired token errors to the sentinel ErrExpiredToken,
+		// consistent with CheckIfTokenExpire behavior.
+		// Without this, *jwt.ValidationError is returned as-is,
+		// making it impossible to match with == ErrExpiredToken downstream.
+		validationErr, ok := err.(*jwt.ValidationError)
+		if ok && validationErr.Errors == jwt.ValidationErrorExpired {
+			return nil, ErrExpiredToken
+		}
+
 		return nil, err
 	}
 
