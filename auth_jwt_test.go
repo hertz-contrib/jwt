@@ -1180,3 +1180,227 @@ func TestLogout(t *testing.T) {
 	assert.DeepEqual(t, http.StatusOK, w.Code)
 	assert.DeepEqual(t, fmt.Sprintf("%s=; domain=%s; path=/", cookieName, cookieDomain), w.Header().Get("Set-Cookie"))
 }
+
+// makeExpiredTokenString creates a token that expired expiredAgo duration ago,
+// with orig_iat set to origIatAgo duration ago.
+func makeExpiredTokenString(expiredAgo, origIatAgo time.Duration) string {
+	token := jwt.New(jwt.GetSigningMethod("HS256"))
+	claims := token.Claims.(jwt.MapClaims)
+	claims["identity"] = "admin"
+	claims["exp"] = time.Now().Add(-expiredAgo).Unix()
+	claims["orig_iat"] = time.Now().Add(-origIatAgo).Unix()
+	tokenString, _ := token.SignedString(key)
+	return tokenString
+}
+
+func transparentRefreshHandler(auth *HertzJWTMiddleware) *route.Engine {
+	r := route.NewEngine(config.NewOptions([]config.Option{}))
+	r.Use(auth.MiddlewareFunc())
+	r.GET("/protected", helloHandler)
+	return r
+}
+
+func TestTransparentRefresh_ExpiredWithinMaxRefresh(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                    "test zone",
+		Key:                      key,
+		Timeout:                  time.Hour,
+		MaxRefresh:               2 * time.Hour,
+		EnableTransparentRefresh: true,
+		Authenticator:            defaultAuthenticator,
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Token expired 1 minute ago, orig_iat 30 minutes ago (within 2h MaxRefresh)
+	tokenString := makeExpiredTokenString(time.Minute, 30*time.Minute)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+}
+
+func TestTransparentRefresh_ExpiredBeyondMaxRefresh(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                    "test zone",
+		Key:                      key,
+		Timeout:                  time.Hour,
+		MaxRefresh:               2 * time.Hour,
+		EnableTransparentRefresh: true,
+		Authenticator:            defaultAuthenticator,
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Token expired 1 minute ago, orig_iat 3 hours ago (beyond 2h MaxRefresh)
+	tokenString := makeExpiredTokenString(time.Minute, 3*time.Hour)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestTransparentRefresh_InvalidSignature(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                    "test zone",
+		Key:                      key,
+		Timeout:                  time.Hour,
+		MaxRefresh:               2 * time.Hour,
+		EnableTransparentRefresh: true,
+		Authenticator:            defaultAuthenticator,
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Create token with wrong key
+	token := jwt.New(jwt.GetSigningMethod("HS256"))
+	claims := token.Claims.(jwt.MapClaims)
+	claims["identity"] = "admin"
+	claims["exp"] = time.Now().Add(-time.Minute).Unix()
+	claims["orig_iat"] = time.Now().Unix()
+	tokenString, _ := token.SignedString([]byte("wrong key"))
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestTransparentRefresh_ValidTokenNotRefreshed(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                    "test zone",
+		Key:                      key,
+		Timeout:                  time.Hour,
+		MaxRefresh:               2 * time.Hour,
+		EnableTransparentRefresh: true,
+		Authenticator:            defaultAuthenticator,
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Valid, non-expired token
+	tokenString := makeTokenString("HS256", "admin")
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+
+	// Should not have a new token in response (no refresh needed)
+	resp := w.Result()
+	assert.DeepEqual(t, "", resp.Header.Get("Authorization"))
+}
+
+func TestTransparentRefresh_DisabledByDefault(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:         "test zone",
+		Key:           key,
+		Timeout:       time.Hour,
+		MaxRefresh:    2 * time.Hour,
+		Authenticator: defaultAuthenticator,
+		// EnableTransparentRefresh not set (defaults to false)
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Token expired 1 minute ago, orig_iat 30 minutes ago (within MaxRefresh)
+	tokenString := makeExpiredTokenString(time.Minute, 30*time.Minute)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestTransparentRefresh_PreservesOrigIat(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                    "test zone",
+		Key:                      key,
+		Timeout:                  time.Hour,
+		MaxRefresh:               2 * time.Hour,
+		EnableTransparentRefresh: true,
+		SendAuthorization:        true,
+		Authenticator:            defaultAuthenticator,
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Create token with specific orig_iat
+	origIat := time.Now().Add(-30 * time.Minute).Unix()
+	token := jwt.New(jwt.GetSigningMethod("HS256"))
+	claims := token.Claims.(jwt.MapClaims)
+	claims["identity"] = "admin"
+	claims["exp"] = time.Now().Add(-time.Minute).Unix()
+	claims["orig_iat"] = origIat
+	tokenString, _ := token.SignedString(key)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+
+	// Parse the new token from Authorization header
+	resp := w.Result()
+	authHeader := resp.Header.Get("Authorization")
+	assert.True(t, strings.HasPrefix(authHeader, "Bearer "))
+
+	newTokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	newToken, err := jwt.Parse(newTokenString, func(token *jwt.Token) (interface{}, error) {
+		return key, nil
+	})
+	assert.Nil(t, err)
+
+	newClaims := newToken.Claims.(jwt.MapClaims)
+	newOrigIat := int64(newClaims["orig_iat"].(float64))
+	assert.DeepEqual(t, origIat, newOrigIat)
+}
+
+func TestTransparentRefresh_CookieAndHeader(t *testing.T) {
+	cookieName := "jwt"
+	cookieDomain := "example.com"
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                    "test zone",
+		Key:                      key,
+		Timeout:                  time.Hour,
+		MaxRefresh:               2 * time.Hour,
+		EnableTransparentRefresh: true,
+		SendCookie:               true,
+		CookieName:               cookieName,
+		CookieDomain:             cookieDomain,
+		SendAuthorization:        true,
+		Authenticator:            defaultAuthenticator,
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Token expired 1 minute ago, orig_iat 30 minutes ago
+	tokenString := makeExpiredTokenString(time.Minute, 30*time.Minute)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusOK, w.Code)
+
+	// Check cookie is set
+	resp := w.Result()
+	assert.True(t, strings.HasPrefix(string(resp.Header.FullCookie()), cookieName+"="))
+
+	// Check Authorization header is set
+	authHeader := resp.Header.Get("Authorization")
+	assert.True(t, strings.HasPrefix(authHeader, "Bearer "))
+}
+
+func TestTransparentRefresh_MaxRefreshZero(t *testing.T) {
+	authMiddleware, _ := New(&HertzJWTMiddleware{
+		Realm:                    "test zone",
+		Key:                      key,
+		Timeout:                  time.Hour,
+		MaxRefresh:               0, // MaxRefresh is zero
+		EnableTransparentRefresh: true,
+		Authenticator:            defaultAuthenticator,
+	})
+
+	handler := transparentRefreshHandler(authMiddleware)
+
+	// Token expired 1 minute ago
+	tokenString := makeExpiredTokenString(time.Minute, 30*time.Minute)
+
+	w := ut.PerformRequest(handler, http.MethodGet, "/protected", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + tokenString})
+	assert.DeepEqual(t, http.StatusUnauthorized, w.Code)
+}

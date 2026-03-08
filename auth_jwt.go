@@ -191,6 +191,13 @@ type HertzJWTMiddleware struct {
 
 	// ParseOptions allow to modify jwt's parser methods
 	ParseOptions []jwt.ParserOption
+
+	// EnableTransparentRefresh enables automatic token refresh during middleware processing.
+	// When true and the token is expired but within the MaxRefresh window,
+	// the middleware will automatically generate a new token and continue processing
+	// the request instead of returning 401.
+	// Optional, defaults to false for backward compatibility.
+	EnableTransparentRefresh bool
 }
 
 var (
@@ -468,8 +475,17 @@ func (mw *HertzJWTMiddleware) MiddlewareFunc() app.HandlerFunc {
 func (mw *HertzJWTMiddleware) middlewareImpl(ctx context.Context, c *app.RequestContext) {
 	claims, err := mw.GetClaimsFromJWT(ctx, c)
 	if err != nil {
-		mw.unauthorized(ctx, c, http.StatusUnauthorized, mw.HTTPStatusMessageFunc(err, ctx, c))
-		return
+		if mw.EnableTransparentRefresh && mw.MaxRefresh > 0 && mw.isExpiredTokenError(err) {
+			if refreshedClaims, refreshErr := mw.tryTransparentRefresh(ctx, c); refreshErr == nil {
+				claims = refreshedClaims
+				err = nil
+			}
+		}
+
+		if err != nil {
+			mw.unauthorized(ctx, c, http.StatusUnauthorized, mw.HTTPStatusMessageFunc(err, ctx, c))
+			return
+		}
 	}
 
 	switch v := claims["exp"].(type) {
@@ -538,6 +554,78 @@ func (mw *HertzJWTMiddleware) GetClaimsFromJWT(ctx context.Context, c *app.Reque
 	}
 
 	return claims, nil
+}
+
+// isExpiredTokenError checks if the error indicates an expired token.
+func (mw *HertzJWTMiddleware) isExpiredTokenError(err error) bool {
+	if errors.Is(err, ErrExpiredToken) {
+		return true
+	}
+
+	var ve *jwt.ValidationError
+	if errors.As(err, &ve) {
+		return ve.Errors == jwt.ValidationErrorExpired
+	}
+
+	return false
+}
+
+// tryTransparentRefresh attempts to refresh an expired token that is still within the MaxRefresh window.
+// On success, it returns the new claims and sets the refreshed token in the response (cookie/header).
+func (mw *HertzJWTMiddleware) tryTransparentRefresh(ctx context.Context, c *app.RequestContext) (MapClaims, error) {
+	claims, err := mw.CheckIfTokenExpire(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create new token with refreshed expiry
+	newToken := jwt.New(jwt.GetSigningMethod(mw.SigningAlgorithm))
+	newClaims := newToken.Claims.(jwt.MapClaims)
+	copyClaims := make(jwt.MapClaims, len(claims))
+
+	for k, v := range claims {
+		newClaims[k] = v
+		copyClaims[k] = v
+	}
+
+	expire := mw.TimeFunc().Add(mw.TimeoutFunc(copyClaims))
+	newClaims["exp"] = expire.Unix()
+
+	// Preserve original orig_iat to maintain MaxRefresh window
+	if origIat, exists := claims["orig_iat"]; exists {
+		newClaims["orig_iat"] = origIat
+	} else {
+		newClaims["orig_iat"] = mw.TimeFunc().Unix()
+	}
+
+	tokenString, err := mw.signedString(newToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set cookie if enabled
+	if mw.SendCookie {
+		expireCookie := mw.TimeFunc().Add(mw.CookieMaxAge)
+		maxage := int(expireCookie.Unix() - mw.TimeFunc().Unix())
+		c.SetCookie(mw.CookieName, tokenString, maxage, "/", mw.CookieDomain, mw.CookieSameSite, mw.SecureCookie, mw.CookieHTTPOnly)
+	}
+
+	// Set Authorization header if enabled
+	if mw.SendAuthorization {
+		c.Header("Authorization", mw.TokenHeadName+" "+tokenString)
+	}
+
+	// Store new token in context
+	c.Set("JWT_TOKEN", tokenString)
+
+	// Build result MapClaims with float64 exp for middlewareImpl compatibility
+	result := make(MapClaims, len(newClaims))
+	for k, v := range newClaims {
+		result[k] = v
+	}
+	result["exp"] = float64(expire.Unix())
+
+	return result, nil
 }
 
 // LoginHandler can be used by clients to get a jwt token.
